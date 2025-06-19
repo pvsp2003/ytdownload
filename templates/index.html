@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube Downloader</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    body {
+      background: linear-gradient(to right, #2c3e50, #3498db);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .card {
+      background: #ffffff;
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 12px 30px rgba( 0, 0, 0, 0.2);
+      max-width: 500px;
+      width: 100%;
+      transition: all 0.3s ease-in-out;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #2c3e50;
+    }
+
+    label {
+      margin-top: 15px;
+      display: block;
+      font-weight: 600;
+      color: #333;
+    }
+
+    input[type="text"], select {
+      width: 100%;
+      padding: 10px;
+      margin-top: 8px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .radio-group {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+
+    .radio-group label {
+      font-weight: 500;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 12px;
+      width: 100%;
+      background: #3498db;
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    button:disabled {
+      background: #7f8c8d;
+      cursor: not-allowed;
+    }
+
+    button:hover:enabled {
+      background: #2980b9;
+    }
+
+    img {
+      margin-top: 10px;
+      border-radius: 10px;
+      max-width: 100%;
+    }
+
+    .loader, .small-loader {
+      margin: 20px auto;
+      border-radius: 50%;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #3498db;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      display: none;
+    }
+
+    .small-loader {
+      width: 30px;
+      height: 30px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    #info, #info-loading, #loading {
+      text-align: center;
+      margin-top: 15px;
+    }
+
+    #title {
+      font-weight: bold;
+      color: #2c3e50;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>YouTube Video Downloader</h2>
+
+    <label for="url">Video URL</label>
+    <input type="text" id="url" placeholder="Paste YouTube video URL here">
+
+    <div id="info-loading" style="display: none;">
+      <div class="small-loader" id="info-spinner"></div>
+      <p>Fetching video info...</p>
+    </div>
+
+    <div id="info" style="display: none;">
+      <p><span id="title"></span></p>
+      <img id="thumb" src="" alt="Video Thumbnail">
+    </div>
+
+    <div class="radio-group">
+      <label><input type="radio" name="format" value="mp3"> MP3</label>
+      <label><input type="radio" name="format" value="mp4" checked> MP4</label>
+    </div>
+
+    <label for="res">Resolution (MP4 only)</label>
+    <select id="res">
+      <option value="1080">1080p</option>
+      <option value="720" selected>720p</option>
+      <option value="480">480p</option>
+      <option value="360">360p</option>
+      <option value="best">Best Available</option>
+    </select>
+
+    <button id="download-btn" onclick="startDownload()">Download</button>
+  </div>
+
+  <script>
+    let typingTimer;
+    const doneTypingInterval = 1000;
+    const urlInput = document.getElementById("url");
+
+    urlInput.addEventListener("keyup", () => {
+      clearTimeout(typingTimer);
+      typingTimer = setTimeout(fetchInfo, doneTypingInterval);
+    });
+
+    urlInput.addEventListener("keydown", () => {
+      clearTimeout(typingTimer);
+    });
+
+    function fetchInfo() {
+      const url = urlInput.value.trim();
+      if (!url.startsWith("http")) return;
+
+      document.getElementById("info").style.display = "none";
+      document.getElementById("info-loading").style.display = "block";
+      document.getElementById("info-spinner").style.display = "block";
+
+      fetch(`/info?url=${encodeURIComponent(url)}`)
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById("info-loading").style.display = "none";
+          if (data.error) return;
+          document.getElementById("info").style.display = "block";
+          document.getElementById("title").textContent = data.title;
+          document.getElementById("thumb").src = data.thumbnail;
+        })
+        .catch(() => {
+          document.getElementById("info-loading").style.display = "none";
+          alert("Failed to fetch video info.");
+        });
+    }
+
+    function startDownload() {
+      const url = urlInput.value.trim();
+      const format = document.querySelector("input[name='format']:checked").value;
+      const res = document.getElementById("res").value;
+      if (!url) return alert("Please enter a valid URL");
+
+      const downloadId = Math.random().toString(36).substring(2, 10);
+      const btn = document.getElementById("download-btn");
+      const originalText = btn.textContent;
+      btn.disabled = true;
+
+      btn.textContent = "Converting... 0%";
+
+      // Initiate conversion but don't start download yet
+      fetch(`/convert?url=${encodeURIComponent(url)}&format=${format}&resolution=${res}&id=${downloadId}`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error("Conversion failed.");
+          }
+
+          const blobPromise = response.blob();
+
+          // Poll progress until 100%
+          const interval = setInterval(() => {
+            fetch(`/progress?id=${downloadId}`)
+              .then(res => res.json())
+              .then(data => {
+                const progress = data.progress;
+                btn.textContent = `Converting... ${progress}%`;
+
+                if (progress >= 100) {
+                  clearInterval(interval);
+
+                  blobPromise.then(blob => {
+                    const a = document.createElement("a");
+                    a.href = URL.createObjectURL(blob);
+                    a.download = "video" + (format === 'mp3' ? '.mp3' : '.mp4');
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(a.href);
+
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                  });
+                }
+              })
+              .catch(() => {
+                clearInterval(interval);
+                btn.textContent = "Error occurred";
+                setTimeout(() => {
+                  btn.textContent = originalText;
+                  btn.disabled = false;
+                }, 2000);
+              });
+          }, 1000);
+
+        })
+        .catch(error => {
+          btn.textContent = "Failed";
+          setTimeout(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+          }, 2000);
+        });
+    }
+  </script>
+</body>
+</html>
